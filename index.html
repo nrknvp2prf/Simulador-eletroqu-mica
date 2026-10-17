@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de transferência de elétrons em pilhas</title>
+<style>
+:root{color-scheme:light;--bg:#f4f6f8;--panel:#fff;--ink:#14202b;--muted:#52606d;--line:#cdd5dc;--e:#1f6feb;--cat:#0f9d8a;--an:#8b5cf6;--accent:#1f6feb;--on:#fff;--sel:#e3eefe}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#10161c;--panel:#17202a;--ink:#e6edf3;--muted:#9aa7b4;--line:#2c3946;--e:#58a6ff;--cat:#2fd0b8;--an:#b794f6;--accent:#58a6ff;--on:#10161c;--sel:#1d3350}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:24px 16px 48px}
+h1{font:600 1.7rem/1.2 Georgia,"Times New Roman",serif;margin:0 0 6px}
+p.lead{margin:0 0 18px;color:var(--muted);max-width:68ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+svg{width:100%;height:auto;display:block}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0}
+button,select{font:inherit;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+button{font-weight:600;cursor:pointer}
+button.primary{background:var(--accent);color:var(--on);border-color:var(--accent)}
+button[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:1px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.pick{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:14px 0 0}
+.pick label{display:flex;gap:8px;align-items:center;color:var(--muted)}
+label.speed{display:flex;gap:8px;align-items:center;color:var(--muted);margin-left:auto}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px}
+.read b{display:block;font-size:1.6rem;font-variant-numeric:tabular-nums}
+.read span{color:var(--muted);font-size:.9rem}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;width:0;background:var(--accent)}
+#msg{margin:0;min-height:3.2em}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0 0;padding:0;list-style:none;color:var(--muted);font-size:.92rem}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+h2{font-size:1.1rem;margin:26px 0 8px}
+ul.obs{margin:0;padding-left:20px;max-width:70ch}
+ul.obs li{margin-bottom:6px}
+table{border-collapse:collapse;width:100%;font-size:.95rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+td.v,th.v{text-align:right}
+tr.sel td{background:var(--sel);font-weight:600}
+.tw{overflow-x:auto}
+.note{color:var(--muted);font-size:.92rem;max-width:72ch}
+svg text{fill:var(--ink);font-family:system-ui,sans-serif}
+.small{font-size:13px;fill:var(--muted)!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Transferência de elétrons em uma pilha</h1>
+<p class="lead">Escolha dois metais, ligue a pilha e veja os elétrons passarem pelo fio e os íons pela ponte salina. O metal com menor potencial de redução vira o ânodo. Depois use a fonte externa para inverter o processo (recarga).</p>
+
+<div class="panel">
+<svg viewBox="0 0 800 430" role="img" aria-labelledby="t d">
+<title id="t">Pilha galvânica</title>
+<desc id="d">Dois recipientes com eletrodos, ligados por um fio no alto e por uma ponte salina. Elétrons percorrem o fio e íons percorrem a ponte.</desc>
+<rect id="liqA" x="70" y="205" width="260" height="175" rx="14" fill="#9fb4c8" fill-opacity=".25" stroke="var(--line)" stroke-width="3"/>
+<rect id="liqC" x="470" y="205" width="260" height="175" rx="14" fill="#3b82d6" fill-opacity=".55" stroke="var(--line)" stroke-width="3"/>
+<g id="ionsL"></g><g id="ionsR"></g>
+<path id="bridge" d="M290 270V175Q290 150 315 150H485Q510 150 510 175V270" fill="none" stroke="var(--line)" stroke-width="30" stroke-linecap="round"/>
+<path d="M290 270V175Q290 150 315 150H485Q510 150 510 175V270" fill="none" stroke="var(--panel)" stroke-width="22" stroke-linecap="round"/>
+<g id="ionsB"></g>
+<text x="400" y="192" text-anchor="middle" class="small">ponte salina</text>
+<rect id="elA" x="180" y="90" width="40" height="250" rx="4" fill="#8a97a6" stroke="var(--line)"/>
+<rect id="elC" x="587" y="90" width="26" height="250" rx="4" fill="#b8733a" stroke="var(--line)"/>
+<path id="wire" d="M200 90V45H600V90" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/>
+<g id="electrons"></g>
+<circle id="bulbGlow" cx="400" cy="45" r="30" fill="#ffd54a" opacity="0"/>
+<circle id="bulb" cx="400" cy="45" r="17" fill="var(--panel)" stroke="var(--ink)" stroke-width="3"/>
+<text id="bulbLabel" x="400" y="14" text-anchor="middle" class="small">lâmpada</text>
+<text id="roleL" x="200" y="118" text-anchor="middle" font-weight="700" font-size="15"></text>
+<text id="roleL2" x="200" y="136" text-anchor="middle" class="small"></text>
+<text id="roleR" x="600" y="118" text-anchor="middle" font-weight="700" font-size="15"></text>
+<text id="roleR2" x="600" y="136" text-anchor="middle" class="small"></text>
+<text id="lblL" x="200" y="408" text-anchor="middle" font-size="15"></text>
+<text id="lblR" x="600" y="408" text-anchor="middle" font-size="15"></text>
+</svg>
+<ul class="legend">
+<li><i style="background:var(--e)"></i>elétron</li>
+<li><i style="background:var(--cat)"></i>cátion do metal</li>
+<li><i style="background:var(--an)"></i>ânion (SO₄²⁻)</li>
+</ul>
+</div>
+
+<div class="pick">
+<label>Metal 1 <select id="m1"></select></label>
+<label>Metal 2 <select id="m2"></select></label>
+</div>
+
+<div class="controls">
+<button id="bGo" class="primary" aria-pressed="false">Ligar a pilha</button>
+<button id="bRec" aria-pressed="false">Recarregar (fonte externa)</button>
+<button id="bReset">Reiniciar</button>
+<label class="speed">Velocidade <input id="speed" type="range" min="0.5" max="4" step="0.5" value="2"></label>
+</div>
+
+<div class="read">
+<div class="panel"><span>Diferença de potencial (ddp)</span><b id="ddp">0,00 V</b></div>
+<div class="panel"><span>Reação já ocorrida</span><b id="pct">0%</b><div class="bar"><i id="pbar"></i></div></div>
+<div class="panel"><span>Sentido dos elétrons</span><b id="dir" style="font-size:1.15rem">parados</b></div>
+</div>
+<div class="panel"><p id="msg" aria-live="polite"></p></div>
+
+<h2>O que observar</h2>
+<ul class="obs">
+<li>No <b>ânodo</b>, o metal perde elétrons e vira íons na solução (oxidação). O eletrodo fica mais fino.</li>
+<li>No <b>cátodo</b>, íons recebem elétrons e viram metal sobre o eletrodo (redução). O eletrodo fica mais grosso.</li>
+<li>A <b>ponte salina</b> leva ânions para o lado do ânodo e cátions para o lado do cátodo. Assim cada solução continua neutra.</li>
+<li>Conforme as quantidades dos dois lados se igualam, a <b>ddp cai a zero</b> e os elétrons param.</li>
+<li>Na <b>recarga</b>, a fonte força os elétrons no sentido contrário (eletrólise). Ânodo e cátodo trocam de papel e a ddp volta.</li>
+<li>Troque os metais e compare: quanto <b>maior a diferença entre os potenciais</b>, maior a ddp da pilha.</li>
+</ul>
+
+<h2>Potenciais padrão de redução (25 °C, 1 mol/L)</h2>
+<p class="note">A ddp da pilha é E°(cátodo) − E°(ânodo). Os dois metais escolhidos aparecem destacados.</p>
+<div class="panel tw"><table>
+<thead><tr><th>Metal</th><th>Semirreação de redução</th><th class="v">E° (V)</th></tr></thead>
+<tbody id="tb"></tbody>
+</table></div>
+<p class="note">Valores de referência reunidos de tabelas didáticas: LibreTexts (<a href="https://chem.libretexts.org/Ancillary_Materials/Reference/Reference_Tables/Electrochemistry_Tables/P2%253A_Standard_Reduction_Potentials_by_Value">P2: Standard Reduction Potentials by Value</a>, que cita Dekker, 1985, e Wiley, 1978), <a href="https://opentextbc.ca/introductorychemistry/back-matter/appendix-standard-reduction-potentials-by-value/">BCcampus Open Textbooks</a>, <a href="https://www.physicsclassroom.com/Chemistry-Tutorial/Reference-Tables/Standard-Reduction-Potentials">The Physics Classroom</a>, <a href="https://wisc.pb.unizin.org/app/uploads/sites/461/2020/11/HalfCellPoten_table.pdf">Universidade de Wisconsin</a> e <a href="https://gchem.cm.utexas.edu/data/standard-potentials.pdf">Universidade do Texas em Austin</a>. As fontes diferem em até cerca de 0,1 V em alguns metais (por exemplo, Ca entre −2,76 e −2,87 V; Ni entre −0,23 e −0,26 V; Fe entre −0,41 e −0,45 V). Aqui foi usado o valor mais frequente entre elas. Para trabalhos formais, confira a fonte adotada pela sua escola.</p>
+<p class="note"><b>Simplificações:</b> a simulação ignora a concentração (equação de Nernst) e faz a ddp cair em linha reta até zero. Na prática, metais como Li, Na, Ca, Mg e Al reagem com a água ou formam camadas de óxido, então não funcionam assim em soluções aquosas comuns.</p>
+</main>
+
+<script>
+(function(){
+var NS="http://www.w3.org/2000/svg",N=14,E0=0,A=null,C=null;
+var M=[
+{s:"Li",n:"lítio",i:"Li⁺",z:1,e:-3.04,c:"#c3cbd3"},
+{s:"Ca",n:"cálcio",i:"Ca²⁺",z:2,e:-2.87,c:"#b5bdc6"},
+{s:"Na",n:"sódio",i:"Na⁺",z:1,e:-2.71,c:"#bfc6ce"},
+{s:"Mg",n:"magnésio",i:"Mg²⁺",z:2,e:-2.37,c:"#aab4be"},
+{s:"Al",n:"alumínio",i:"Al³⁺",z:3,e:-1.66,c:"#b9c2cc"},
+{s:"Zn",n:"zinco",i:"Zn²⁺",z:2,e:-0.76,c:"#8a97a6"},
+{s:"Fe",n:"ferro",i:"Fe²⁺",z:2,e:-0.44,c:"#6f7b88",l:"#9ccc8a"},
+{s:"Cd",n:"cádmio",i:"Cd²⁺",z:2,e:-0.40,c:"#9aa5b1"},
+{s:"Ni",n:"níquel",i:"Ni²⁺",z:2,e:-0.25,c:"#8fa3ad",l:"#4caf7a"},
+{s:"Sn",n:"estanho",i:"Sn²⁺",z:2,e:-0.14,c:"#aeb7c0"},
+{s:"Pb",n:"chumbo",i:"Pb²⁺",z:2,e:-0.13,c:"#6e7b8b"},
+{s:"Cu",n:"cobre",i:"Cu²⁺",z:2,e:0.34,c:"#b8733a",l:"#3b82d6"},
+{s:"Ag",n:"prata",i:"Ag⁺",z:1,e:0.80,c:"#d3d9df"},
+{s:"Au",n:"ouro",i:"Au³⁺",z:3,e:1.50,c:"#d4a72c",l:"#e0b83a"}
+];
+var DEF="#9fb4c8";
+var $=function(i){return document.getElementById(i)};
+var wire=$("wire"),bridge=$("bridge"),LW=wire.getTotalLength(),LB=bridge.getTotalLength();
+var mode="idle",p=0,phW=0,phB=0,last=0,i;
+function dot(g,cls,r){var c=document.createElementNS(NS,"circle");c.setAttribute("r",r);c.setAttribute("fill","var(--"+cls+")");c.setAttribute("stroke","var(--panel)");c.setAttribute("stroke-width","1.5");g.appendChild(c);return c}
+var elec=[],bc=[],ba=[];
+for(i=0;i<N;i++)elec.push(dot($("electrons"),"e",6));
+for(i=0;i<5;i++){bc.push(dot($("ionsB"),"cat",6));ba.push(dot($("ionsB"),"an",6))}
+var pools={lc:[],la:[],rc:[],ra:[]},box={l:[85,315,225,365],r:[485,715,225,365]};
+function rnd(a,b){return a+Math.random()*(b-a)}
+function setN(key,side,cls,n){
+ var arr=pools[key],g=$(side==="l"?"ionsL":"ionsR"),b=box[side];
+ while(arr.length<n){var d=dot(g,cls,6);d._x=rnd(b[0],b[1]);d._y=rnd(b[2],b[3]);arr.push(d)}
+ while(arr.length>n)g.removeChild(arr.pop());
+}
+function move(arr,side){
+ var b=box[side];
+ arr.forEach(function(d){
+  d._x=Math.min(b[1],Math.max(b[0],d._x+rnd(-2.2,2.2)));
+  d._y=Math.min(b[3],Math.max(b[2],d._y+rnd(-2.2,2.2)));
+  d.setAttribute("cx",d._x);d.setAttribute("cy",d._y)});
+}
+function pos(el,L,f){return el.getPointAtLength(((f%1)+1)%1*L)}
+function fmt(v){return v.toFixed(2).replace(".",",")}
+function rx(m){return m.i+" + "+(m.z>1?m.z:"")+"e⁻ → "+m.s}
+
+var sel1=$("m1"),sel2=$("m2"),tb=$("tb");
+M.forEach(function(m,k){
+ [sel1,sel2].forEach(function(s){var o=document.createElement("option");o.value=k;o.textContent=m.s+" ("+m.n+")";s.appendChild(o)});
+});
+M.slice().sort(function(a,b){return a.e-b.e}).forEach(function(m){
+ var tr=document.createElement("tr");tr.id="r"+m.s;
+ var sg=m.e>0?"+":m.e<0?"−":"";
+ tr.innerHTML="<td>"+m.s+" ("+m.n+")</td><td>"+rx(m)+"</td><td class='v'>"+sg+Math.abs(m.e).toFixed(2).replace(".",",")+"</td>";
+ tb.appendChild(tr);
+});
+function idx(s){for(var k=0;k<M.length;k++)if(M[k].s===s)return k}
+sel1.value=idx("Zn");sel2.value=idx("Cu");
+
+function pick(){
+ var x=M[+sel1.value],y=M[+sel2.value];
+ A=x.e<=y.e?x:y;C=x.e<=y.e?y:x;E0=C.e-A.e;
+ $("elA").setAttribute("fill",A.c);$("elC").setAttribute("fill",C.c);
+ $("liqA").setAttribute("fill",A.l||DEF);$("liqC").setAttribute("fill",C.l||DEF);
+ $("lblL").textContent=A.s+" (eletrodo) em solução de "+A.i;
+ $("lblR").textContent=C.s+" (eletrodo) em solução de "+C.i;
+ Array.prototype.forEach.call(tb.children,function(r){r.className=(r.id==="r"+A.s||r.id==="r"+C.s)?"sel":""});
+ mode="idle";p=0;render();message();
+}
+function render(){
+ var E=E0*(1-p),k=Math.round(p*9),dis=mode==="discharge",rec=mode==="recharge";
+ var aN=5+k,cN=14-k;
+ setN("lc","l","cat",aN);setN("la","l","an",aN);
+ setN("rc","r","cat",cN);setN("ra","r","an",cN);
+ var wa=40-p*16,wc=26+p*16;
+ $("elA").setAttribute("width",wa);$("elA").setAttribute("x",200-wa/2);
+ $("elC").setAttribute("width",wc);$("elC").setAttribute("x",600-wc/2);
+ $("liqA").setAttribute("fill-opacity",(0.12+0.43*p).toFixed(2));
+ $("liqC").setAttribute("fill-opacity",(0.12+0.43*(1-p)).toFixed(2));
+ $("ddp").textContent=fmt(E)+" V";
+ $("pct").textContent=Math.round(p*100)+"%";
+ $("pbar").style.width=(p*100)+"%";
+ $("bulbGlow").setAttribute("opacity",dis?(0.15+0.75*E/Math.max(E0,1.1)).toFixed(2):0);
+ $("bulb").setAttribute("fill",rec?"var(--accent)":"var(--panel)");
+ $("bulbLabel").textContent=rec?"fonte externa":"lâmpada";
+ $("roleL").textContent=rec?"CÁTODO":"ÂNODO";
+ $("roleL2").textContent=rec?"redução: recebe elétrons":"oxidação: perde elétrons";
+ $("roleR").textContent=rec?"ÂNODO":"CÁTODO";
+ $("roleR2").textContent=rec?"oxidação: perde elétrons":"redução: recebe elétrons";
+ $("dir").textContent=dis?A.s+" → fio → "+C.s:rec?C.s+" → fio → "+A.s:"parados";
+ $("bGo").setAttribute("aria-pressed",dis);$("bRec").setAttribute("aria-pressed",rec);
+ $("bGo").textContent=dis?"Pausar":"Ligar a pilha";
+ $("bRec").textContent=rec?"Pausar recarga":"Recarregar (fonte externa)";
+}
+function message(){
+ var m;
+ if(E0<=0)m="Os dois eletrodos são do mesmo metal, então não há diferença de potencial e nada se move. Escolha metais diferentes.";
+ else if(mode==="discharge")m="A pilha está funcionando. Átomos de "+A.n+" viram íons, os elétrons liberados seguem pelo fio até o "+C.n+", e íons de "+C.n+" viram metal. A ponte salina move íons para manter as soluções neutras.";
+ else if(mode==="recharge")m="Fonte externa ligada. Ela força os elétrons no sentido contrário. As reações se invertem (eletrólise), os papéis de ânodo e cátodo trocam e a diferença entre os dois lados volta a crescer.";
+ else if(p>=1)m="A ddp chegou a zero. As quantidades dos dois lados estão parecidas e nada mais se move. A pilha está descarregada. Use a fonte externa para recarregar.";
+ else if(p<=0)m="Pilha carregada: ânodo de "+A.n+", cátodo de "+C.n+", ddp de "+fmt(E0)+" V. Nada se move até o circuito ser fechado. Clique em Ligar a pilha.";
+ else m="Simulação pausada. Continue de onde parou ou reinicie.";
+ $("msg").textContent=m;
+}
+function frame(t){
+ var dt=Math.min(0.05,(t-last)/1000||0);last=t;
+ var sp=+$("speed").value;
+ if(mode!=="idle"){
+  var dis=mode==="discharge",E=E0*(1-p),d=dis?1:-1;
+  p=Math.min(1,Math.max(0,p+d*dt*0.03*sp));
+  var flow=dis?(0.25+0.75*E/E0):1;
+  phW+=d*dt*0.08*sp*flow;phB+=d*dt*0.05*sp*flow;
+  if(dis&&p>=1||!dis&&p<=0){mode="idle";message()}
+  render();
+  move(pools.lc,"l");move(pools.la,"l");move(pools.rc,"r");move(pools.ra,"r");
+ }
+ for(i=0;i<N;i++){var q=pos(wire,LW,i/N+phW);elec[i].setAttribute("cx",q.x);elec[i].setAttribute("cy",q.y)}
+ for(i=0;i<5;i++){
+  var c=pos(bridge,LB,i/5+phB),a=pos(bridge,LB,i/5+0.1-phB);
+  bc[i].setAttribute("cx",c.x);bc[i].setAttribute("cy",c.y-6);
+  ba[i].setAttribute("cx",a.x);ba[i].setAttribute("cy",a.y+6);
+ }
+ requestAnimationFrame(frame);
+}
+function start(m){
+ if(E0<=0){message();return}
+ if(mode===m)mode="idle";
+ else{
+  if(m==="discharge"&&p>=1)return;
+  if(m==="recharge"&&p<=0)return;
+  mode=m;
+ }
+ render();message();
+}
+$("bGo").onclick=function(){start("discharge")};
+$("bRec").onclick=function(){start("recharge")};
+$("bReset").onclick=function(){mode="idle";p=0;render();message()};
+sel1.onchange=sel2.onchange=pick;
+pick();
+["lc","la","rc","ra"].forEach(function(k){move(pools[k],k[0]==="l"?"l":"r")});
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
